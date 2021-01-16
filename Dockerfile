@@ -1,15 +1,13 @@
-FROM nginx:alpine
+FROM golang:alpine as builder
+RUN mkdir /build 
+ADD . /build/
+WORKDIR /build
+RUN apk add git
+RUN go get github.com/prometheus/client_golang/prometheus
+RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -ldflags '-extldflags "-static"' -o main . 
 
-# Remove default NGINX Config
-# Take care of Nginx logging
-RUN rm /etc/nginx/conf.d/default.conf && \
-    ln -sf /dev/stdout /var/log/nginx/access.log && \
-    ln -sf /dev/stderr /var/log/nginx/error.log
-
-# NGINX Config
-COPY ./default.conf /etc/nginx/conf.d/default.conf
-
-# Resources
-COPY content/ /var/www/html/
-
-CMD ["nginx", "-g", "daemon off;"]
+FROM scratch
+COPY --from=builder /build/main /app/
+COPY --from=builder /build/www/ /app/www
+WORKDIR /app
+CMD ["./main"]
